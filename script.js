@@ -143,8 +143,23 @@ function deleteStudent(id) {
     if (confirm("Apakah Anda yakin ingin menghapus siswa ini?")) {
         students = students.filter(student => student.id !== id);
         saveToLocalStorage(); // Simpan ke localStorage
+        
+        // Hapus juga data absensi siswa dari localStorage
+        const attendanceRaw = JSON.parse(localStorage.getItem('attendance')) || {};
+        Object.keys(attendanceRaw).forEach(dateKey => {
+            if (attendanceRaw[dateKey] && attendanceRaw[dateKey][id]) {
+                delete attendanceRaw[dateKey][id];
+            }
+        });
+        localStorage.setItem('attendance', JSON.stringify(attendanceRaw));
+        
+        // Hapus juga data pembayaran siswa dari localStorage
+        let payments = JSON.parse(localStorage.getItem('payments')) || [];
+        payments = payments.filter(payment => payment.studentId !== id);
+        localStorage.setItem('payments', JSON.stringify(payments));
+        
         renderStudents();
-        alert("Siswa berhasil dihapus!");
+        alert('Siswa berhasil dihapus! (Data absensi dan pembayaran juga dihapus)');
     }
 }
 
@@ -197,7 +212,7 @@ function renderAttendance() {
     students.forEach(student => {
         const dateKey = today.toISOString().split('T')[0];
         const studentAttendance = attendanceData[dateKey] && attendanceData[dateKey][student.id];
-        const isPresent = studentAttendance && studentAttendance.present;
+        const isPresent = studentAttendance ? studentAttendance.present : false;
         const entryTime = studentAttendance ? studentAttendance.entryTime : '';
         const exitTime = studentAttendance ? studentAttendance.exitTime : '';
         
@@ -209,12 +224,33 @@ function renderAttendance() {
                 <span class="student-time">Masuk: ${entryTime || '-'} | Pulang: ${exitTime || '-'}</span>
             </div>
             <label class="switch">
-                <input type="checkbox" id="att-${student.id}" ${isPresent ? 'checked' : ''}>
+                <input type="checkbox" id="att-${student.id}" ${isPresent ? 'checked' : ''} onchange="toggleAttendance(${student.id})">
                 <span class="slider"></span>
             </label>
         `;
         attendanceList.appendChild(item);
     });
+}
+
+// Fungsi untuk toggle checkbox absensi manual
+function toggleAttendance(studentId) {
+    const checkbox = document.getElementById(`att-${studentId}`);
+    const isChecked = checkbox.checked;
+    const dateKey = today.toISOString().split('T')[0];
+    
+    if (!attendanceData[dateKey]) {
+        attendanceData[dateKey] = {};
+    }
+    
+    const existingData = attendanceData[dateKey][studentId] || {};
+    
+    attendanceData[dateKey][studentId] = {
+        present: isChecked,
+        entryTime: existingData.entryTime || '',
+        exitTime: existingData.exitTime || ''
+    };
+    
+    localStorage.setItem('attendance', JSON.stringify(attendanceData));
 }
 
 // Fungsi Absen Masuk
